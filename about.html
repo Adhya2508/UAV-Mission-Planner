@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UAV Mission Planner — How It Works</title>
+<meta name="description" content="Complete technical explainer for the UAV Mission Planner: purpose, interactive drawing, grid algorithm, no-fly zones, swarm, telemetry, simulation, and KML export.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0e0710;--bg-card:#18091a;--bg-panel:#200d22;--line:rgba(255,255,255,0.07);--line-mid:rgba(255,255,255,0.12);--accent:#ff7a45;--accent-2:#f5a878;--accent-glow:rgba(255,122,69,0.25);--zone-red:#ef5b5b;--safe:#4fce8a;--info:#8ab6ff;--purple:#b98cff;--text:#f0e8ea;--muted:#a08090;--muted2:#705065;}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;font-size:16px;}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;line-height:1.7;overflow-x:hidden;}
+::-webkit-scrollbar{width:6px;}::-webkit-scrollbar-track{background:var(--bg);}::-webkit-scrollbar-thumb{background:var(--line-mid);border-radius:10px;}
+.container{max-width:980px;margin:0 auto;padding:0 28px;position:relative;z-index:1;}
+nav{position:sticky;top:0;z-index:100;background:rgba(14,7,16,0.88);backdrop-filter:blur(14px);border-bottom:1px solid var(--line);padding:14px 0;}
+.nav-inner{max-width:980px;margin:0 auto;padding:0 28px;display:flex;align-items:center;justify-content:space-between;gap:20px;}
+.nav-logo{font-family:'Fraunces',serif;font-size:15px;font-weight:500;color:var(--accent);text-decoration:none;display:flex;align-items:center;gap:8px;}
+.nav-logo .dot{width:8px;height:8px;background:var(--accent);border-radius:50%;box-shadow:0 0 8px var(--accent);}
+.nav-links{display:flex;gap:6px;flex-wrap:wrap;}
+.nav-links a{font-size:12px;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:6px;transition:color .15s,background .15s;font-weight:500;}
+.nav-links a:hover{color:var(--text);background:var(--line);}
+.nav-cta{background:var(--accent);color:#1a0a10!important;font-weight:700!important;padding:6px 14px!important;border-radius:7px!important;}
+.hero{padding:80px 0 60px;text-align:center;}
+.hero-tag{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);border:1px solid rgba(255,122,69,0.35);background:rgba(255,122,69,0.08);padding:5px 14px;border-radius:20px;margin-bottom:24px;}
+.hero h1{font-family:'Fraunces',serif;font-size:clamp(36px,6vw,66px);font-weight:700;line-height:1.07;letter-spacing:-0.03em;margin-bottom:22px;background:linear-gradient(135deg,#fff 30%,var(--accent-2) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.hero .subtitle{font-size:17px;color:var(--muted);max-width:620px;margin:0 auto 36px;line-height:1.65;}
+.hero-img{width:100%;max-width:900px;border-radius:18px;border:1px solid var(--line-mid);box-shadow:0 40px 120px rgba(0,0,0,0.75),0 0 80px rgba(255,122,69,0.08);display:block;margin:0 auto;object-fit:cover;}
+.stats-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin:48px 0;}
+.stat{background:var(--bg-card);padding:22px 20px;text-align:center;position:relative;}
+.stat .num{font-family:'Fraunces',serif;font-size:32px;font-weight:700;color:var(--accent);line-height:1;margin-bottom:6px;}
+.stat .lbl{font-size:12px;color:var(--muted);font-weight:500;}
+section{padding:72px 0;border-top:1px solid var(--line);}
+.section-tag{display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:12px;}
+.section-tag .icon{width:20px;height:20px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;}
+.section-tag .icon.orange{background:rgba(255,122,69,0.18);color:var(--accent);}
+.section-tag .icon.red{background:rgba(239,91,91,0.18);color:var(--zone-red);}
+.section-tag .icon.blue{background:rgba(138,182,255,0.18);color:var(--info);}
+.section-tag .icon.green{background:rgba(79,206,138,0.18);color:var(--safe);}
+.section-tag .icon.purple{background:rgba(185,140,255,0.18);color:var(--purple);}
+.section-title{font-family:'Fraunces',serif;font-size:clamp(24px,4vw,38px);font-weight:700;line-height:1.15;letter-spacing:-0.02em;margin-bottom:16px;color:var(--text);}
+.section-title span{color:var(--accent);}
+.section-lead{font-size:16px;color:var(--muted);max-width:600px;line-height:1.7;margin-bottom:44px;}
+.card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;}
+.card{background:var(--bg-card);border:1px solid var(--line);border-radius:14px;padding:24px;transition:border-color .2s,box-shadow .2s,transform .2s;position:relative;overflow:hidden;}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--card-accent,var(--accent));opacity:0;transition:opacity .25s;border-radius:14px 14px 0 0;}
+.card:hover{border-color:var(--line-mid);box-shadow:0 16px 48px rgba(0,0,0,0.4);transform:translateY(-2px);}
+.card:hover::before{opacity:1;}
+.card .c-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;margin-bottom:14px;}
+.card h3{font-size:15px;font-weight:600;color:var(--text);margin-bottom:8px;}
+.card p{font-size:13.5px;color:var(--muted);line-height:1.6;}
+.flow{display:flex;flex-direction:column;gap:0;position:relative;}
+.flow::before{content:'';position:absolute;left:23px;top:44px;bottom:44px;width:2px;background:linear-gradient(to bottom,var(--accent),transparent);border-radius:2px;}
+.flow-step{display:flex;gap:22px;padding:22px 0;position:relative;}
+.flow-num{width:48px;height:48px;min-width:48px;border-radius:50%;background:var(--bg-panel);border:2px solid var(--accent);display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:17px;font-weight:700;color:var(--accent);box-shadow:0 0 18px var(--accent-glow);}
+.flow-body{flex:1;padding-top:8px;}
+.flow-body h3{font-size:16px;font-weight:600;margin-bottom:6px;color:var(--text);}
+.flow-body p{font-size:13.5px;color:var(--muted);line-height:1.65;}
+.flow-body .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
+.tag{font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;border:1px solid transparent;}
+.tag-orange{background:rgba(255,122,69,0.12);color:var(--accent);border-color:rgba(255,122,69,0.3);}
+.tag-red{background:rgba(239,91,91,0.12);color:var(--zone-red);border-color:rgba(239,91,91,0.3);}
+.tag-blue{background:rgba(138,182,255,0.12);color:var(--info);border-color:rgba(138,182,255,0.3);}
+.tag-green{background:rgba(79,206,138,0.12);color:var(--safe);border-color:rgba(79,206,138,0.3);}
+.tag-purple{background:rgba(185,140,255,0.12);color:var(--purple);border-color:rgba(185,140,255,0.3);}
+.formula-block{background:var(--bg-panel);border:1px solid var(--line-mid);border-left:3px solid var(--accent);border-radius:10px;padding:20px 22px;margin:18px 0;overflow-x:auto;}
+.formula-block .label{font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:10px;}
+.formula{font-family:'JetBrains Mono',monospace;font-size:13.5px;color:#e8d5ff;line-height:2;white-space:pre-wrap;}
+.formula .var{color:var(--accent-2);}
+.formula .op{color:var(--muted);}
+.formula .const{color:var(--info);}
+.formula .comment{color:var(--muted2);font-style:italic;}
+code{font-family:'JetBrains Mono',monospace;font-size:12.5px;background:var(--bg-panel);border:1px solid var(--line);padding:2px 6px;border-radius:5px;color:var(--accent-2);}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:28px;align-items:start;}
+.callout{border-radius:12px;padding:18px 20px;margin:20px 0;display:flex;gap:14px;align-items:flex-start;}
+.callout-icon{font-size:20px;flex-shrink:0;margin-top:1px;}
+.callout .callout-title{font-size:13px;font-weight:700;margin-bottom:4px;}
+.callout .callout-text{font-size:13px;color:var(--muted);line-height:1.6;}
+.callout-orange{background:rgba(255,122,69,0.09);border:1px solid rgba(255,122,69,0.25);}
+.callout-orange .callout-title{color:var(--accent);}
+.callout-red{background:rgba(239,91,91,0.09);border:1px solid rgba(239,91,91,0.25);}
+.callout-red .callout-title{color:var(--zone-red);}
+.callout-blue{background:rgba(138,182,255,0.09);border:1px solid rgba(138,182,255,0.25);}
+.callout-blue .callout-title{color:var(--info);}
+.callout-green{background:rgba(79,206,138,0.09);border:1px solid rgba(79,206,138,0.25);}
+.callout-green .callout-title{color:var(--safe);}
+.callout-purple{background:rgba(185,140,255,0.09);border:1px solid rgba(185,140,255,0.25);}
+.callout-purple .callout-title{color:var(--purple);}
+.algo{counter-reset:algo;display:flex;flex-direction:column;gap:10px;margin:20px 0;}
+.algo-step{display:flex;gap:14px;align-items:flex-start;padding:14px 18px;background:var(--bg-card);border:1px solid var(--line);border-radius:10px;counter-increment:algo;}
+.algo-step::before{content:counter(algo);min-width:24px;height:24px;border-radius:50%;background:var(--accent);color:#1a0a10;font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.algo-step h4{font-size:13.5px;font-weight:600;color:var(--text);margin-bottom:4px;}
+.algo-step p{font-size:13px;color:var(--muted);line-height:1.55;}
+.data-table{width:100%;border-collapse:collapse;font-size:13.5px;margin:20px 0;}
+.data-table thead th{text-align:left;padding:10px 14px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line-mid);}
+.data-table tbody td{padding:11px 14px;border-bottom:1px solid var(--line);color:var(--text);vertical-align:top;}
+.data-table tbody td:first-child{color:var(--accent-2);font-weight:600;}
+.data-table tbody tr:last-child td{border-bottom:none;}
+.data-table tbody tr:hover td{background:var(--bg-panel);}
+.pipeline{display:flex;gap:0;overflow-x:auto;margin:24px 0;padding-bottom:4px;}
+.pipeline-step{flex:1;min-width:120px;text-align:center;padding:18px 10px;background:var(--bg-card);border:1px solid var(--line);position:relative;}
+.pipeline-step:not(:last-child)::after{content:'→';position:absolute;right:-14px;top:50%;transform:translateY(-50%);font-size:18px;color:var(--accent);z-index:2;background:var(--bg);padding:0 2px;}
+.pipeline-step:first-child{border-radius:12px 0 0 12px;}
+.pipeline-step:last-child{border-radius:0 12px 12px 0;}
+.pipeline-step .p-icon{font-size:22px;margin-bottom:8px;}
+.pipeline-step .p-label{font-size:11.5px;font-weight:600;color:var(--text);line-height:1.3;}
+.pipeline-step .p-sub{font-size:10px;color:var(--muted);margin-top:4px;}
+.tech-chips{display:flex;flex-wrap:wrap;gap:10px;margin:20px 0;}
+.tech-chip{background:var(--bg-panel);border:1px solid var(--line-mid);border-radius:8px;padding:10px 16px;font-size:13px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px;transition:border-color .2s;}
+.tech-chip:hover{border-color:var(--accent);}
+.tech-chip .badge{font-size:10px;font-weight:700;background:rgba(255,122,69,0.15);color:var(--accent);padding:1px 6px;border-radius:4px;}
+footer{border-top:1px solid var(--line);padding:40px 0;text-align:center;color:var(--muted);font-size:13px;}
+footer a{color:var(--accent);text-decoration:none;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(24px);}to{opacity:1;transform:translateY(0);}}
+.fade-up{animation:fadeUp 0.55s ease both;}
+.delay-1{animation-delay:.1s;}.delay-2{animation-delay:.2s;}.delay-3{animation-delay:.3s;}.delay-4{animation-delay:.4s;}
+@keyframes glow{0%,100%{text-shadow:0 0 0 transparent;}50%{text-shadow:0 0 18px rgba(255,122,69,0.6);}}
+.glow{animation:glow 3s ease-in-out infinite;}
+@media(max-width:720px){.two-col{grid-template-columns:1fr;}.stats-bar{grid-template-columns:1fr 1fr;}.flow::before{display:none;}}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <a class="nav-logo" href="about.html">
+      <span class="dot"></span>UAV Mission Planner
+    </a>
+    <div class="nav-links">
+      <a href="#purpose">Purpose</a>
+      <a href="#workflow">Workflow</a>
+      <a href="#drawing">Drawing</a>
+      <a href="#grid">Grid Engine</a>
+      <a href="#nofly">No-Fly</a>
+      <a href="#telemetry">Telemetry</a>
+      <a href="#simulation">Simulation</a>
+      <a href="drone.html" class="nav-cta">Launch App &#x2192;</a>
+    </div>
+  </div>
+</nav>
+
+<div class="hero">
+  <div class="container">
+    <div class="hero-tag fade-up">&#x1F6F8; Technical Documentation &middot; Ground Control Station</div>
+    <h1 class="fade-up delay-1">UAV Mission Planner<br>&#x2014; How It Works</h1>
+    <p class="subtitle fade-up delay-2">A fully browser-native, client-side drone survey planning tool that computes coverage grids, enforces no-fly zones, allocates multi-drone swarms, and simulates flight &#x2014; all without a server.</p>
+  </div>
+</div>
+
+<div class="container">
+  <div class="stats-bar fade-up delay-4">
+    <div class="stat"><div class="num glow">100%</div><div class="lbl">Browser-native<br>No server required</div></div>
+    <div class="stat"><div class="num glow">6</div><div class="lbl">Algorithm stages<br>per path generation</div></div>
+    <div class="stat"><div class="num glow">5</div><div class="lbl">Max drones in<br>parallel swarm</div></div>
+    <div class="stat"><div class="num glow">&#x221E;</div><div class="lbl">No-fly zones<br>supported</div></div>
+  </div>
+</div>
+
+<!-- PURPOSE -->
+<section id="purpose">
+  <div class="container">
+    <div class="section-tag"><div class="icon orange">&#x1F3AF;</div> Purpose</div>
+    <h2 class="section-title">What is this tool<br>and <span>why does it exist?</span></h2>
+    <p class="section-lead">Planning a drone survey mission manually is tedious and error-prone. This tool automates everything from area definition to obstacle avoidance to battery budgeting &#x2014; in a single HTML file that runs entirely in your browser.</p>
+    <div class="card-grid">
+      <div class="card" style="--card-accent:var(--accent)"><div class="c-icon" style="background:rgba(255,122,69,0.15)">&#x1F5FA;&#xFE0F;</div><h3>Aerial Survey Planning</h3><p>Draw a polygon over any real-world area on a live satellite map, configure camera and flight parameters, and automatically generate an optimised lawnmower coverage path with numbered waypoints.</p></div>
+      <div class="card" style="--card-accent:var(--zone-red)"><div class="c-icon" style="background:rgba(239,91,91,0.15)">&#x1F6AB;</div><h3>Guaranteed No-Fly Exclusion</h3><p>Mark restricted zones (buildings, hazards, restricted airspace). Three independent algorithm layers guarantee the generated path never enters those areas &#x2014; neither waypoints nor transition segments.</p></div>
+      <div class="card" style="--card-accent:var(--safe)"><div class="c-icon" style="background:rgba(79,206,138,0.15)">&#x1F50B;</div><h3>Battery &amp; Time Telemetry</h3><p>Given cruise speed and endurance, the planner estimates total distance, mission time, and battery consumption &#x2014; and warns you before you launch with insufficient charge.</p></div>
+      <div class="card" style="--card-accent:var(--info)"><div class="c-icon" style="background:rgba(138,182,255,0.15)">&#x1F916;</div><h3>Multi-Drone Swarm</h3><p>Split any mission across up to 5 drones. The boundary is partitioned into equal vertical strips; each drone independently plans and flies its own lane simultaneously, reducing mission time by ~N.</p></div>
+      <div class="card" style="--card-accent:var(--purple)"><div class="c-icon" style="background:rgba(185,140,255,0.15)">&#x1F3AC;</div><h3>Live Flight Simulation</h3><p>Visualise all drones flying their missions simultaneously in the map, with bearing-correct rotating icons, a progress bar, elapsed time, distance flown, and simulated battery drain.</p></div>
+      <div class="card" style="--card-accent:var(--accent-2)"><div class="c-icon" style="background:rgba(245,168,120,0.15)">&#x1F4E4;</div><h3>KML Export</h3><p>Export the full mission as a standard <code>.kml</code> file compatible with QGroundControl, DJI Pilot, Mission Planner, or Google Earth. Altitude is stored as relative-to-ground AGL.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- WORKFLOW -->
+<section id="workflow">
+  <div class="container">
+    <div class="section-tag"><div class="icon blue">&#x1F4CB;</div> Workflow</div>
+    <h2 class="section-title">How you use it &#x2014;<br><span>step by step</span></h2>
+    <p class="section-lead">Seven sequential stages take you from a blank satellite map to a ready-to-fly, battery-verified drone mission in minutes.</p>
+    <div class="pipeline">
+      <div class="pipeline-step"><div class="p-icon">&#x270F;&#xFE0F;</div><div class="p-label">Draw Boundary</div><div class="p-sub">Click polygon corners</div></div>
+      <div class="pipeline-step"><div class="p-icon">&#x1F6AB;</div><div class="p-label">Add No-Fly Zones</div><div class="p-sub">Optional exclusions</div></div>
+      <div class="pipeline-step"><div class="p-icon">&#x1F4F7;</div><div class="p-label">Set Camera</div><div class="p-sub">Swath, overlap, alt</div></div>
+      <div class="pipeline-step"><div class="p-icon">&#x1F50B;</div><div class="p-label">Set Aircraft</div><div class="p-sub">Speed, endurance</div></div>
+      <div class="pipeline-step"><div class="p-icon">&#x1F916;</div><div class="p-label">Allocate Swarm</div><div class="p-sub">1&ndash;5 drones</div></div>
+      <div class="pipeline-step"><div class="p-icon">&#x26A1;</div><div class="p-label">Generate Grid</div><div class="p-sub">All paths computed</div></div>
+      <div class="pipeline-step"><div class="p-icon">&#x1F3AC;</div><div class="p-label">Simulate / Export</div><div class="p-sub">Fly or export KML</div></div>
+    </div>
+    <div class="flow">
+      <div class="flow-step"><div class="flow-num">1</div><div class="flow-body"><h3>Draw the Survey Boundary</h3><p>Click <b>"+ Draw survey boundary"</b> and click on the satellite map to place polygon corner checkpoints. A rubber-band line preview follows your cursor. When you have &ge; 3 points, click the green first-point marker to close the shape, press Enter, double-click, or click <b>Finish boundary</b>. The polygon closes and its area is computed via Turf.js.</p><div class="tags"><span class="tag tag-orange">Leaflet.js</span><span class="tag tag-orange">Custom Draw Engine</span><span class="tag tag-orange">Turf.js area()</span></div></div></div>
+      <div class="flow-step"><div class="flow-num">2</div><div class="flow-body"><h3>Mark Exclusion / No-Fly Zones</h3><p>Click <b>"+ Add exclusion zone"</b> and draw another polygon around any restricted area. You can add unlimited zones. The surveyable area in telemetry updates live as zones are added or removed using Turf.js geometric polygon subtraction.</p><div class="tags"><span class="tag tag-red">Turf.js difference()</span><span class="tag tag-red">Ray-casting PiP</span></div></div></div>
+      <div class="flow-step"><div class="flow-num">3</div><div class="flow-body"><h3>Configure Coverage Settings</h3><p>Set the camera <b>swath width</b> (how wide each image strip covers on the ground), <b>image overlap %</b> (how much consecutive images share — essential for photogrammetry), and <b>flight altitude</b>. These determine how dense the lawnmower grid is.</p><div class="tags"><span class="tag tag-blue">Row spacing formula</span></div></div></div>
+      <div class="flow-step"><div class="flow-num">4</div><div class="flow-body"><h3>Set Aircraft &amp; Battery Parameters</h3><p>Define <b>cruise speed</b> (m/s), <b>max flight endurance</b> (minutes), and a <b>safety battery threshold</b> (%). If estimated battery use exceeds the threshold, a red warning banner prevents an underpowered launch.</p><div class="tags"><span class="tag tag-green">Haversine distance</span><span class="tag tag-green">Battery % formula</span></div></div></div>
+      <div class="flow-step"><div class="flow-num">5</div><div class="flow-body"><h3>Swarm Allocation (1&ndash;5 Drones)</h3><p>Choose how many drones to deploy. The boundary polygon is split into N equal-width vertical strips using Turf bboxClip. Each drone gets its own independent strip and independently plans its lawnmower while avoiding all no-fly zones within it.</p><div class="tags"><span class="tag tag-purple">Turf.js bboxClip()</span><span class="tag tag-purple">Parallel execution</span></div></div></div>
+      <div class="flow-step"><div class="flow-num">6</div><div class="flow-body"><h3>Generate the Coverage Grid</h3><p>Click <b>"Generate grid"</b>. The six-stage path planning algorithm runs instantly client-side &#x2014; producing a complete, obstacle-safe waypoint set for each drone that fully covers the assigned area.</p><div class="tags"><span class="tag tag-orange">Scanline decomposition</span><span class="tag tag-orange">Lawnmower pattern</span><span class="tag tag-orange">Dijkstra routing</span></div></div></div>
+      <div class="flow-step"><div class="flow-num">7</div><div class="flow-body"><h3>Simulate and / or Export</h3><p>Hit <b>&#x25B6; Play</b> to watch all drones fly simultaneously, with bearing-correct icons, progress bar, elapsed time, and battery drain. Or export a <code>.kml</code> file for real hardware upload into QGroundControl or DJI Pilot.</p><div class="tags"><span class="tag tag-blue">requestAnimationFrame</span><span class="tag tag-blue">KML/OGC 2.2 standard</span></div></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- DRAWING ENGINE -->
+<section id="drawing">
+  <div class="container">
+    <div class="section-tag"><div class="icon orange">&#x270F;&#xFE0F;</div> Drawing Engine</div>
+    <h2 class="section-title">The interactive<br><span>polygon drawing system</span></h2>
+    <p class="section-lead">A fully custom, from-scratch drawing engine replaces Leaflet.draw, eliminating version compatibility bugs and providing a tight, responsive UX with multiple ways to complete a shape.</p>
+    <div class="two-col">
+      <div>
+        <h3 style="font-size:16px;margin-bottom:14px;color:var(--text)">Drawing State Machine</h3>
+        <p style="font-size:13.5px;color:var(--muted);margin-bottom:16px">The engine maintains a <code>drawMode</code> state (<code>'boundary'</code>, <code>'zone'</code>, or <code>null</code>) and a <code>draftPoints</code> array of <code>[lng, lat]</code> pairs. Every map click appends a point. Every mouse move updates a live rubber-band preview line from the last placed point to the cursor.</p>
+        <div class="callout callout-orange"><div class="callout-icon">&#x1F4A1;</div><div><div class="callout-title">Multiple Completion Methods</div><div class="callout-text">Shape can be closed by: clicking the first point (highlighted green), pressing Enter, double-clicking (&ge;3 points), clicking Finish in sidebar, or clicking Finish in the on-map HUD. All routes call the same <code>finishDrawing()</code>.</div></div></div>
+        <div class="callout callout-blue"><div class="callout-icon">&#x2328;&#xFE0F;</div><div><div class="callout-title">Keyboard Shortcuts</div><div class="callout-text"><kbd style="background:var(--bg-panel);border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-family:monospace;font-size:10.5px;color:var(--accent-2)">Enter</kbd> Finish &middot; <kbd style="background:var(--bg-panel);border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-family:monospace;font-size:10.5px;color:var(--accent-2)">Backspace</kbd> / <kbd style="background:var(--bg-panel);border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-family:monospace;font-size:10.5px;color:var(--accent-2)">Ctrl+Z</kbd> Delete last point &middot; <kbd style="background:var(--bg-panel);border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-family:monospace;font-size:10.5px;color:var(--accent-2)">Esc</kbd> Cancel</div></div></div>
+      </div>
+      <div>
+        <h3 style="font-size:16px;margin-bottom:14px;color:var(--text)">Coordinate System</h3>
+        <p style="font-size:13.5px;color:var(--muted);margin-bottom:12px">Draft points are stored as <code>[longitude, latitude]</code> pairs (GeoJSON order) for Turf.js compatibility. Leaflet uses reversed <code>[lat, lon]</code> order, so all rendering swaps the pair. The closed ring always appends the first point as the last element:</p>
+        <div class="formula-block"><div class="label">Polygon Ring Closing</div><div class="formula"><span class="var">ring</span> <span class="op">=</span> [...<span class="var">draftPoints</span>, <span class="var">draftPoints</span>[<span class="const">0</span>]]
+<span class="var">polygon</span> <span class="op">=</span> turf.polygon([<span class="var">ring</span>])</div></div>
+        <h3 style="font-size:16px;margin:24px 0 12px;color:var(--text)">Dual Control Surfaces</h3>
+        <table class="data-table">
+          <thead><tr><th>Action</th><th>Sidebar</th><th>Map HUD</th></tr></thead>
+          <tbody>
+            <tr><td>Delete last point</td><td>&#x2713; Button</td><td>&#x2713; Button</td></tr>
+            <tr><td>Finish shape</td><td>&#x2713; Button</td><td>&#x2713; Button</td></tr>
+            <tr><td>Cancel drawing</td><td>&#x2713; Button</td><td>&#x2713; Button</td></tr>
+            <tr><td>Point count</td><td>&#x2713; Live counter</td><td>&#x2713; Live counter</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- GRID ENGINE -->
+<section id="grid">
+  <div class="container">
+    <div class="section-tag"><div class="icon orange">&#x26A1;</div> Grid Engine</div>
+    <h2 class="section-title">Coverage path generation &#x2014;<br><span>six-stage algorithm</span></h2>
+    <p class="section-lead">The core of the planner is a deterministic, 100%-coverage path planner built from scratch in pure JavaScript with no dependencies beyond Turf.js geometry helpers.</p>
+
+    <h3 style="font-size:15px;margin-bottom:10px;color:var(--accent-2)">Stage 1 &#x2014; Row Spacing Calculation</h3>
+    <p style="font-size:13.5px;color:var(--muted);margin-bottom:8px">The distance between adjacent flight rows derives from camera swath width and desired image overlap:</p>
+    <div class="formula-block"><div class="label">Row Spacing Formula</div><div class="formula"><span class="var">spacingM</span>   <span class="op">=</span> max( <span class="var">swathWidth</span> <span class="op">&#215;</span> (<span class="const">1</span> <span class="op">-</span> <span class="var">overlap</span>), <span class="const">3</span> )  <span class="comment">// metres, minimum 3 m</span>
+<span class="var">spacingDeg</span> <span class="op">=</span> <span class="var">spacingM</span> <span class="op">/</span> <span class="const">111320</span>                  <span class="comment">// convert m to decimal degrees latitude</span></div></div>
+    <div class="callout callout-orange"><div class="callout-icon">&#x1F4D0;</div><div><div class="callout-title">Example</div><div class="callout-text">Swath = 40 m, Overlap = 70% &#x2192; Spacing = 40 &#x00D7; (1 &#x2212; 0.70) = <b>12 m</b> between rows &#x2192; 12 &#x00F7; 111320 &#x2248; <b>0.0001078&deg;</b></div></div></div>
+
+    <h3 style="font-size:15px;margin:30px 0 10px;color:var(--accent-2)">Stage 2 &#x2014; Horizontal Scanline Decomposition with Interval Subtraction</h3>
+    <p style="font-size:13.5px;color:var(--muted);margin-bottom:10px">A horizontal scan line sweeps from the bottom to the top of the bounding box at each <code>spacingDeg</code> step. At each latitude <code>y</code>, all polygon edge crossings are found and paired into flight segments. Obstacle intervals are then subtracted:</p>
+    <div class="formula-block"><div class="label">Scanline Intersection (per polygon edge)</div><div class="formula"><span class="comment">If (y1 &lt;= y &lt; y2) or (y2 &lt;= y &lt; y1):     // edge crosses the scan line</span>
+    <span class="var">t</span>  <span class="op">=</span> (<span class="var">y</span> <span class="op">-</span> <span class="var">y1</span>) <span class="op">/</span> (<span class="var">y2</span> <span class="op">-</span> <span class="var">y1</span>)
+    <span class="var">x</span>  <span class="op">=</span> <span class="var">x1</span> <span class="op">+</span> <span class="var">t</span> <span class="op">&#215;</span> (<span class="var">x2</span> <span class="op">-</span> <span class="var">x1</span>)</div></div>
+    <div class="formula-block"><div class="label">1D Interval Subtraction with 2 m Safety Buffer</div><div class="formula"><span class="var">buf</span>  <span class="op">=</span> <span class="const">0.00002</span>  <span class="comment">// ~2 m clearance margin in degrees</span>
+<span class="comment">For each boundary interval [a, b] and obstacle interval [ox1, ox2]:</span>
+  <span class="comment">No overlap    &#x2192; keep [a, b] unchanged</span>
+  <span class="comment">Partial left  &#x2192; keep [ox2+buf, b]</span>
+  <span class="comment">Partial right &#x2192; keep [a, ox1-buf]</span>
+  <span class="comment">Split centre  &#x2192; keep [a, ox1-buf] + [ox2+buf, b]</span>
+  <span class="comment">Full overlap  &#x2192; discard interval entirely</span></div></div>
+
+    <h3 style="font-size:15px;margin:30px 0 10px;color:var(--accent-2)">Stage 3 &#x2014; Cellular Decomposition</h3>
+    <p style="font-size:13.5px;color:var(--muted);margin-bottom:10px">Raw scan segments are grouped into continuous cells &#x2014; vertically contiguous columns of overlapping intervals. Each cell becomes its own independent lawnmower sub-mission, preventing paths from jumping across no-fly gaps.</p>
+    <div class="callout callout-blue"><div class="callout-icon">&#x1F9E9;</div><div><div class="callout-title">Why Cells?</div><div class="callout-text">Without cells, a row-by-row lawnmower would draw a straight line from the last point of one row to the start of the next, potentially crossing an obstacle. Cells isolate each continuous region so transitions only happen within the safe, clear corridor of that region.</div></div></div>
+
+    <h3 style="font-size:15px;margin:30px 0 10px;color:var(--accent-2)">Stage 4 &#x2014; Boustrophedon (Lawnmower) Waypoints</h3>
+    <p style="font-size:13.5px;color:var(--muted);margin-bottom:10px">Within each cell, rows alternate left-to-right and right-to-left. Each row contributes exactly 2 waypoints:</p>
+    <div class="formula-block"><div class="label">Direction Alternation</div><div class="formula"><span class="var">ltr</span>    <span class="op">=</span> (rowIndex <span class="op">%</span> 2 <span class="op">===</span> 0)       <span class="comment">// even = left-to-right</span>
+<span class="var">startX</span> <span class="op">=</span> <span class="var">ltr</span> ? <span class="var">seg.x0</span> : <span class="var">seg.x1</span>
+<span class="var">endX</span>   <span class="op">=</span> <span class="var">ltr</span> ? <span class="var">seg.x1</span> : <span class="var">seg.x0</span></div></div>
+
+    <h3 style="font-size:15px;margin:30px 0 10px;color:var(--accent-2)">Stage 5 &#x2014; Nearest-Neighbour Cell Sequencing</h3>
+    <p style="font-size:13.5px;color:var(--muted);margin-bottom:10px">Cells are ordered to minimise total transit distance using a greedy nearest-neighbour heuristic. Starting from the top-left cell, it always picks the next unvisited cell whose start is closest to the current end point (Haversine metric).</p>
+
+    <h3 style="font-size:15px;margin:30px 0 10px;color:var(--accent-2)">Stage 6 &#x2014; Dijkstra Obstacle-Avoidance Routing &amp; Final Safety Scan</h3>
+    <div class="algo">
+      <div class="algo-step"><div><h4>Dense Sampling Penetration Test</h4><p>20 intermediate points are sampled along each transition segment. Any sample inside an obstacle (ray-casting) flags the segment unsafe.</p></div></div>
+      <div class="algo-step"><div><h4>Edge Intersection Test</h4><p>Parametric line-segment intersection is checked against every obstacle polygon edge. Small epsilon (0.001) prevents false triggers at shared endpoints.</p></div></div>
+      <div class="algo-step"><div><h4>Visibility Graph Construction</h4><p>Navigation nodes: start point, end point, plus all obstacle corner vertices buffered 10 m outward from their centroid. Edges connect any two mutually-visible nodes.</p></div></div>
+      <div class="algo-step"><div><h4>Dijkstra Shortest Path</h4><p>Dijkstra runs on the visibility graph from start to end. Edge weights are Haversine distances. The result is the shortest safe detour around all obstacles.</p></div></div>
+      <div class="algo-step"><div><h4>Final Safety Verification Pass</h4><p>Every consecutive waypoint pair in the assembled mission is re-checked. Any remaining unsafe segment is rerouted. This double pass guarantees 100% obstacle-free paths.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- NO-FLY ZONES -->
+<section id="nofly">
+  <div class="container">
+    <div class="section-tag"><div class="icon red">&#x1F6AB;</div> No-Fly Zone System</div>
+    <h2 class="section-title">How no-fly zones are<br><span>enforced at every level</span></h2>
+    <p class="section-lead">Three independent, layered mechanisms ensure the drone never enters a restricted area &#x2014; from the raw coverage grid, through inter-cell transitions, to the final assembled waypoint sequence.</p>
+    <div class="card-grid">
+      <div class="card" style="--card-accent:var(--zone-red)"><div class="c-icon" style="background:rgba(239,91,91,0.15)">&#x1F4D0;</div><h3>Layer 1 &#x2014; Interval Subtraction</h3><p>At every scan latitude, the obstacle's intersection interval is subtracted from the boundary's intervals before any waypoints are placed. Waypoints can only be generated in the obstacle-free remainder, with a 2 m clearance buffer on each side.</p></div>
+      <div class="card" style="--card-accent:var(--zone-red)"><div class="c-icon" style="background:rgba(239,91,91,0.15)">&#x1F9ED;</div><h3>Layer 2 &#x2014; Dijkstra Cell Routing</h3><p>Cross-cell transition segments are routed via the visibility graph + Dijkstra's algorithm, threading the shortest path through safe corridors. Obstacle corner nodes are pushed 10 m outward for edge clearance.</p></div>
+      <div class="card" style="--card-accent:var(--zone-red)"><div class="c-icon" style="background:rgba(239,91,91,0.15)">&#x1F52C;</div><h3>Layer 3 &#x2014; Final Safety Scan</h3><p>Every consecutive waypoint pair in the assembled mission is re-tested with the full penetration check (dense sampling + edge intersection). Any remaining unsafe pair is rerouted. This final pass catches all edge cases.</p></div>
+    </div>
+    <div class="two-col" style="margin-top:36px">
+      <div>
+        <h3 style="font-size:15px;margin-bottom:12px;color:var(--accent-2)">Ray-Casting Point-in-Polygon</h3>
+        <div class="formula-block"><div class="label">Ray Casting Algorithm</div><div class="formula"><span class="comment">For each polygon edge (xi,yi) &#x2192; (xj,yj):</span>
+  <span class="var">crossesY</span> <span class="op">=</span> ((yi <span class="op">&gt;</span> lat) !== (yj <span class="op">&gt;</span> lat))
+  <span class="var">crossesX</span> <span class="op">=</span> (lng <span class="op">&lt;</span> (xj<span class="op">-</span>xi) <span class="op">&#215;</span> (lat<span class="op">-</span>yi) <span class="op">/</span> (yj<span class="op">-</span>yi) <span class="op">+</span> xi)
+  if <span class="var">crossesY</span> <span class="op">&amp;&amp;</span> <span class="var">crossesX</span>: <span class="var">inside</span> <span class="op">=</span> !<span class="var">inside</span>
+<span class="comment">Odd crossings = point is INSIDE</span></div></div>
+      </div>
+      <div>
+        <h3 style="font-size:15px;margin-bottom:12px;color:var(--accent-2)">Segment Intersection Test</h3>
+        <div class="formula-block"><div class="label">Parametric Line-Segment Intersection</div><div class="formula"><span class="var">denom</span> <span class="op">=</span> (y4<span class="op">-</span>y3)(x2<span class="op">-</span>x1) <span class="op">-</span> (x4<span class="op">-</span>x3)(y2<span class="op">-</span>y1)
+<span class="var">ua</span>    <span class="op">=</span> [(x4<span class="op">-</span>x3)(y1<span class="op">-</span>y3) <span class="op">-</span> (y4<span class="op">-</span>y3)(x1<span class="op">-</span>x3)] <span class="op">/</span> denom
+<span class="var">ub</span>    <span class="op">=</span> [(x2<span class="op">-</span>x1)(y1<span class="op">-</span>y3) <span class="op">-</span> (y2<span class="op">-</span>y1)(x1<span class="op">-</span>x3)] <span class="op">/</span> denom
+<span class="comment">Intersects if: 0.001 &lt; ua &lt; 0.999 AND 0.001 &lt; ub &lt; 0.999</span></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TELEMETRY -->
+<section id="telemetry">
+  <div class="container">
+    <div class="section-tag"><div class="icon green">&#x1F4E1;</div> Pre-flight Telemetry</div>
+    <h2 class="section-title">How every number<br><span>is calculated</span></h2>
+    <p class="section-lead">All telemetry is computed client-side from the generated waypoints and slider values. No GPS, no server, no external API &#x2014; pure geometry and physics.</p>
+    <div class="two-col">
+      <div>
+        <h3 style="font-size:15px;margin-bottom:12px;color:var(--accent-2)">Haversine Distance</h3>
+        <p style="font-size:13.5px;color:var(--muted);margin-bottom:12px">Each consecutive waypoint pair distance is computed using the Haversine formula, which accounts for Earth's spherical geometry:</p>
+        <div class="formula-block"><div class="label">Haversine Formula</div><div class="formula"><span class="var">R</span>    <span class="op">=</span> <span class="const">6,371,000</span>  <span class="comment">// Earth radius (metres)</span>
+<span class="var">dLat</span> <span class="op">=</span> (lat2 <span class="op">-</span> lat1) <span class="op">&#215;</span> &#x3C0;/180
+<span class="var">dLon</span> <span class="op">=</span> (lon2 <span class="op">-</span> lon1) <span class="op">&#215;</span> &#x3C0;/180
+<span class="var">a</span>    <span class="op">=</span> sin&#xB2;(dLat/2) <span class="op">+</span> cos(lat1)cos(lat2)sin&#xB2;(dLon/2)
+<span class="var">dist</span> <span class="op">=</span> 2R <span class="op">&#215;</span> arcsin(&#x221A;a)</div></div>
+      </div>
+      <div>
+        <h3 style="font-size:15px;margin-bottom:12px;color:var(--accent-2)">Mission Time &amp; Battery</h3>
+        <p style="font-size:13.5px;color:var(--muted);margin-bottom:12px">Total distance is divided by cruise speed to get flight time, then compared against maximum endurance:</p>
+        <div class="formula-block"><div class="label">Time &amp; Battery Formulae</div><div class="formula"><span class="var">totalDist</span> <span class="op">=</span> &#x3A3; haversine(wp[i], wp[i<span class="op">+</span>1])
+<span class="var">timeMin</span>   <span class="op">=</span> totalDist <span class="op">/</span> (cruiseSpeed <span class="op">&#215;</span> 60)
+<span class="var">battery%</span>  <span class="op">=</span> (timeMin <span class="op">/</span> maxEnduranceMin) <span class="op">&#215;</span> 100</div></div>
+        <div class="formula-block"><div class="label">Swarm Parallel Time</div><div class="formula"><span class="var">missionTime</span> <span class="op">=</span> max(drone[1..N].timeMin)
+<span class="comment">// Wall-clock time = slowest individual drone</span></div></div>
+      </div>
+    </div>
+    <h3 style="font-size:15px;margin:32px 0 12px;color:var(--accent-2)">All Telemetry Fields</h3>
+    <table class="data-table">
+      <thead><tr><th>Field</th><th>Formula / Source</th><th>Unit</th></tr></thead>
+      <tbody>
+        <tr><td>Surveyable area</td><td>turf.area(boundary &#x2212; &#x3A3; obstacles)</td><td>m&#xB2;</td></tr>
+        <tr><td>Total waypoints</td><td>Sum of all waypoints across all drone missions</td><td>count</td></tr>
+        <tr><td>Combined distance</td><td>&#x3A3; Haversine(wp[i] &#x2192; wp[i+1]) across all drones</td><td>m / km</td></tr>
+        <tr><td>Mission duration</td><td>max(dist / speed) across drones</td><td>minutes</td></tr>
+        <tr><td>Battery estimate</td><td>(timeMin / maxEnduranceMin) &#x00D7; 100</td><td>%</td></tr>
+        <tr><td>Safety status</td><td>worst-case battery% vs threshold slider value</td><td>Safe / Warning</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- SIMULATION -->
+<section id="simulation">
+  <div class="container">
+    <div class="section-tag"><div class="icon purple">&#x1F3AC;</div> Flight Simulation</div>
+    <h2 class="section-title">Real-time drone<br><span>flight animation</span></h2>
+    <p class="section-lead">The simulation engine animates all drones simultaneously using <code>requestAnimationFrame</code>, interpolating position along the waypoint path and rotating the drone icon to face its direction of travel.</p>
+    <div class="two-col">
+      <div>
+        <h3 style="font-size:15px;margin-bottom:12px;color:var(--accent-2)">Path Metadata Build</h3>
+        <p style="font-size:13.5px;color:var(--muted);margin-bottom:12px">Each drone's waypoints are preprocessed into a leg list with cumulative distances, enabling O(n) position lookup:</p>
+        <div class="formula-block"><div class="label">Cumulative Distance Preprocessing</div><div class="formula"><span class="comment">For each leg i &#x2192; i+1:</span>
+  <span class="var">leg.dist</span>     <span class="op">=</span> haversine(wp[i], wp[i+1])
+  <span class="var">leg.cumStart</span> <span class="op">=</span> &#x3A3; dist of all prior legs</div></div>
+      </div>
+      <div>
+        <h3 style="font-size:15px;margin-bottom:12px;color:var(--accent-2)">Position Interpolation</h3>
+        <p style="font-size:13.5px;color:var(--muted);margin-bottom:12px">At each frame, elapsed seconds &#x00D7; speed &#x00D7; multiplier = metres flown. The active leg is found, then lat/lon is linearly interpolated:</p>
+        <div class="formula-block"><div class="label">Linear Interpolation on Active Leg</div><div class="formula"><span class="var">distCovered</span> <span class="op">=</span> simElapsed <span class="op">&#215;</span> speed
+<span class="var">t</span>            <span class="op">=</span> (distCovered <span class="op">-</span> leg.cumStart) <span class="op">/</span> leg.dist
+<span class="var">lat</span>          <span class="op">=</span> from.lat <span class="op">+</span> t <span class="op">&#215;</span> (to.lat <span class="op">-</span> from.lat)
+<span class="var">lon</span>          <span class="op">=</span> from.lon <span class="op">+</span> t <span class="op">&#215;</span> (to.lon <span class="op">-</span> from.lon)</div></div>
+      </div>
+    </div>
+    <h3 style="font-size:15px;margin:28px 0 12px;color:var(--accent-2)">Bearing Calculation (Icon Rotation)</h3>
+    <div class="formula-block"><div class="label">Forward Azimuth</div><div class="formula"><span class="var">y</span>       <span class="op">=</span> sin(&#x394;lon) <span class="op">&#215;</span> cos(lat2)
+<span class="var">x</span>       <span class="op">=</span> cos(lat1) <span class="op">&#215;</span> sin(lat2) <span class="op">-</span> sin(lat1) <span class="op">&#215;</span> cos(lat2) <span class="op">&#215;</span> cos(&#x394;lon)
+<span class="var">bearing</span> <span class="op">=</span> (atan2(y, x) <span class="op">&#215;</span> 180/&#x3C0; <span class="op">+</span> 360) <span class="op">%</span> 360  <span class="comment">// 0&#xB0; = North</span></div></div>
+    <table class="data-table" style="margin-top:24px">
+      <thead><tr><th>Control</th><th>Description</th><th>Range</th></tr></thead>
+      <tbody>
+        <tr><td>&#x25B6; Play</td><td>Starts / resumes animation. If finished, auto-resets first.</td><td>&#x2014;</td></tr>
+        <tr><td>Pause</td><td>Halts animation; resuming continues from exact position.</td><td>&#x2014;</td></tr>
+        <tr><td>Reset</td><td>Clears drone markers and resets elapsed time to 0.</td><td>&#x2014;</td></tr>
+        <tr><td>Playback speed</td><td>Time multiplier. 20&#x00D7; means 20 s of flight per 1 s of animation.</td><td>1&#x00D7; &#x2013; 100&#x00D7;</td></tr>
+        <tr><td>Battery readout</td><td>(elapsed_min / max_endurance_min) &#x00D7; 100%, clamped at 100%.</td><td>0 &#x2013; 100%</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- TECH STACK -->
+<section>
+  <div class="container">
+    <div class="section-tag"><div class="icon blue">&#x1F527;</div> Technology Stack</div>
+    <h2 class="section-title">Built on open-source<br><span>browser standards</span></h2>
+    <p class="section-lead">Zero backend. Zero build step. Open the HTML file in any modern browser and it works instantly &#x2014; all computation is local, all data stays on your device.</p>
+    <div class="tech-chips">
+      <div class="tech-chip">&#x1F5FA;&#xFE0F; Leaflet.js 1.9.4 <span class="badge">Map</span></div>
+      <div class="tech-chip">&#x1F4D0; Turf.js 6.5.0 <span class="badge">Geometry</span></div>
+      <div class="tech-chip">&#x1F30D; Esri World Imagery <span class="badge">Tiles</span></div>
+      <div class="tech-chip">&#x1F524; Inter + Fraunces <span class="badge">Fonts</span></div>
+      <div class="tech-chip">&#x1F4C4; Vanilla HTML/CSS/JS <span class="badge">Core</span></div>
+      <div class="tech-chip">&#x1F3AC; requestAnimationFrame <span class="badge">Sim Loop</span></div>
+      <div class="tech-chip">&#x1F4BE; Blob + createObjectURL <span class="badge">Export</span></div>
+    </div>
+    <h3 style="font-size:15px;margin:28px 0 12px;color:var(--accent-2)">Parameter Reference</h3>
+    <table class="data-table">
+      <thead><tr><th>Parameter</th><th>Range</th><th>Default</th><th>Effect</th></tr></thead>
+      <tbody>
+        <tr><td>Camera swath width</td><td>10&#x2013;150 m</td><td>40 m</td><td>Width of ground covered per flight row. Wider = fewer rows, fewer waypoints.</td></tr>
+        <tr><td>Image overlap</td><td>10&#x2013;90%</td><td>70%</td><td>Shared area between consecutive images. Higher = more rows = denser coverage for photogrammetry.</td></tr>
+        <tr><td>Flight altitude</td><td>10&#x2013;120 m</td><td>50 m</td><td>AGL altitude stored in all waypoints and KML. Higher altitude = wider real-world swath.</td></tr>
+        <tr><td>Cruise speed</td><td>1&#x2013;15 m/s</td><td>5 m/s</td><td>Used to calculate mission time, battery %, and simulation playback speed.</td></tr>
+        <tr><td>Max flight endurance</td><td>8&#x2013;45 min</td><td>25 min</td><td>Denominator in battery % formula. Full-charge flight time of the aircraft.</td></tr>
+        <tr><td>Safety threshold</td><td>40&#x2013;90%</td><td>70%</td><td>If estimated battery% exceeds this, a red warning banner appears. Leave headroom for RTH.</td></tr>
+        <tr><td>Number of drones</td><td>1&#x2013;5</td><td>1</td><td>Splits boundary into N vertical strips. Each drone plans independently. Parallel time &#x2248; 1/N of solo time.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- CTA -->
+<section style="text-align:center;padding:80px 0;">
+  <div class="container">
+    <div class="hero-tag" style="display:inline-flex;margin-bottom:20px">&#x1F680; Ready to plan your mission?</div>
+    <h2 class="section-title" style="max-width:520px;margin:0 auto 18px">Open the planner and <span>fly smarter</span></h2>
+    <p style="font-size:15px;color:var(--muted);margin-bottom:32px;max-width:480px;margin-left:auto;margin-right:auto">Everything runs locally in your browser. No account, no upload, no server. Your mission data never leaves your device.</p>
+    <a href="drone.html" id="ctaBtn" style="display:inline-block;background:var(--accent);color:#1a0a10;font-weight:700;font-size:15px;padding:14px 32px;border-radius:10px;text-decoration:none;letter-spacing:.01em;transition:opacity .15s,transform .15s;box-shadow:0 8px 32px rgba(255,122,69,0.35);">Launch UAV Mission Planner &#x2192;</a>
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <p style="margin-bottom:8px"><b style="color:var(--text)">UAV Mission Planner</b> &#x2014; Ground Control Station</p>
+    <p>Built with <a href="https://leafletjs.com">Leaflet.js</a>, <a href="https://turfjs.org">Turf.js</a>, and Esri World Imagery tiles. All computation is 100% client-side. &nbsp;<a href="drone.html">Open the app &#x2192;</a></p>
+  </div>
+</footer>
+
+<script>
+document.querySelectorAll('a[href^="#"]').forEach(a => {
+  a.addEventListener('click', e => {
+    e.preventDefault();
+    const t = document.querySelector(a.getAttribute('href'));
+    if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+});
+const cta = document.getElementById('ctaBtn');
+if (cta) {
+  cta.addEventListener('mouseover', () => { cta.style.opacity = '.88'; cta.style.transform = 'translateY(-2px)'; });
+  cta.addEventListener('mouseout',  () => { cta.style.opacity = '1';   cta.style.transform = 'translateY(0)'; });
+}
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) { e.target.style.opacity='1'; e.target.style.transform='translateY(0)'; obs.unobserve(e.target); }
+  });
+}, { threshold: 0.07 });
+document.querySelectorAll('.card,.flow-step,.algo-step,.stat,.pipeline-step,.tech-chip').forEach(el => {
+  el.style.opacity = '0'; el.style.transform = 'translateY(18px)'; el.style.transition = 'opacity .4s ease, transform .4s ease';
+  obs.observe(el);
+});
+</script>
+</body>
+</html>
