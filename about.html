@@ -162,7 +162,7 @@ footer a{color:var(--accent);text-decoration:none;}
   <div class="container">
     <div class="section-tag"><div class="icon orange">&#x1F3AF;</div> Purpose</div>
     <h2 class="section-title">What is this tool<br>and <span>why does it exist?</span></h2>
-    <p class="section-lead">Planning a drone survey mission manually is tedious and error-prone. This tool automates everything from area definition to obstacle avoidance to battery budgeting &#x2014; in a single HTML file that runs entirely in your browser.</p>
+    <p class="section-lead">Planning a drone survey mission manually is tedious and error-prone. This tool automates everything from area definition to obstacle avoidance to battery budgeting &#x2014; a browser-native app that runs entirely on your device with no installation required.</p>
     <div class="card-grid">
       <div class="card" style="--card-accent:var(--accent)"><div class="c-icon" style="background:rgba(255,122,69,0.15)">&#x1F5FA;&#xFE0F;</div><h3>Aerial Survey Planning</h3><p>Draw a polygon over any real-world area on a live satellite map, configure camera and flight parameters, and automatically generate an optimised lawnmower coverage path with numbered waypoints.</p></div>
       <div class="card" style="--card-accent:var(--zone-red)"><div class="c-icon" style="background:rgba(239,91,91,0.15)">&#x1F6AB;</div><h3>Guaranteed No-Fly Exclusion</h3><p>Mark restricted zones (buildings, hazards, restricted airspace). Three independent algorithm layers guarantee the generated path never enters those areas &#x2014; neither waypoints nor transition segments.</p></div>
@@ -401,7 +401,7 @@ footer a{color:var(--accent);text-decoration:none;}
   <div class="container">
     <div class="section-tag"><div class="icon blue">&#x1F527;</div> Technology Stack</div>
     <h2 class="section-title">Built on open-source<br><span>browser standards</span></h2>
-    <p class="section-lead">Zero backend. Zero build step. Open the HTML file in any modern browser and it works instantly &#x2014; all computation is local, all data stays on your device.</p>
+    <p class="section-lead">Zero backend. Zero build step. Open the app in any modern browser and it works instantly &#x2014; all computation is local, all data stays on your device.</p>
     <div class="tech-chips">
       <div class="tech-chip">&#x1F5FA;&#xFE0F; Leaflet.js 1.9.4 <span class="badge">Map</span></div>
       <div class="tech-chip">&#x1F4D0; Turf.js 6.5.0 <span class="badge">Geometry</span></div>
@@ -417,7 +417,7 @@ footer a{color:var(--accent);text-decoration:none;}
       <tbody>
         <tr><td>Camera swath width</td><td>10&#x2013;150 m</td><td>40 m</td><td>Width of ground covered per flight row. Wider = fewer rows, fewer waypoints.</td></tr>
         <tr><td>Image overlap</td><td>10&#x2013;90%</td><td>70%</td><td>Shared area between consecutive images. Higher = more rows = denser coverage for photogrammetry.</td></tr>
-        <tr><td>Flight altitude</td><td>10&#x2013;120 m</td><td>50 m</td><td>AGL altitude stored in all waypoints and KML. Higher altitude = wider real-world swath.</td></tr>
+        <tr><td>Flight altitude</td><td>10&#x2013;120 m</td><td>50 m</td><td>AGL altitude stored in all waypoints and KML. Scales the effective ground swath (higher altitude = wider footprint = fewer, more spaced rows).</td></tr>
         <tr><td>Cruise speed</td><td>1&#x2013;15 m/s</td><td>5 m/s</td><td>Used to calculate mission time, battery %, and simulation playback speed.</td></tr>
         <tr><td>Max flight endurance</td><td>8&#x2013;45 min</td><td>25 min</td><td>Denominator in battery % formula. Full-charge flight time of the aircraft.</td></tr>
         <tr><td>Safety threshold</td><td>40&#x2013;90%</td><td>70%</td><td>If estimated battery% exceeds this, a red warning banner appears. Leave headroom for RTH.</td></tr>
